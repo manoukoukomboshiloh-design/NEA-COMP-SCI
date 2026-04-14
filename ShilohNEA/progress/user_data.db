@@ -1,0 +1,23 @@
+import sqlite3
+
+con = sqlite3.connect('user_data.db')
+cur = con.cursor()
+
+cur.execute('''DROP TABLE IF EXISTS progress''')
+
+cur.execute('''CREATE TABLE IF NOT EXISTS progress (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    topic TEXT,
+    score INTEGER,
+    FOREIGN KEY (user_id) REFERENCES userdata(id)
+)''')
+
+cur.execute('''INSERT OR IGNORE INTO progress (user_id, topic, score) VALUES ('1', 1, 0)''')
+
+con.commit()
+
+for row in cur.execute('SELECT * FROM progress'):
+    print(row)
+
+
