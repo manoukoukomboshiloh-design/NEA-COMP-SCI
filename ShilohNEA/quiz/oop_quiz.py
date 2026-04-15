@@ -1,20 +1,19 @@
-import time
-from typing import List
-
-import sqlite3
+import time             #timestamps
+from typing import List   #improving readability
+import sqlite3             # allowing me to interact with my database
 
 class Question:
     def __init__(self, qid: int, text: str, answer: str):
-        self.qid = qid
+        self.qid = qid   #unique ID
         self.text = text
-        self.answer = answer
+        self.answer = answer             #allat is for a single question. These questions are stored in the JSON file
 
 
-# Linked list node for quiz history
+
 class QuizHistoryNode:
     def __init__(self, quiz, next_node=None):
         self.quiz = quiz
-        self.next = next_node
+        self.next = next_node       #got nodes to link in the last quiz to the next one,allowing me to NOW weave in a linked list
 
 class Quiz:
     def __init__(self, topic: str, questions: List[Question]):
@@ -27,11 +26,11 @@ class Quiz:
         print(f"\n{'='*60}")
         print(f"QUIZ: {self.topic}")
         print(f"{'='*60}\n")
-        for i, q in enumerate(self.questions, start=1):
-            print(f"Q{i}: {q.text}")
+        for i, q in enumerate(self.questions, start=1):        
+            print(f"Q{i}: {q.text}")              #looping through questions, while enuerate will give each question a question number
             user_answer = input("Your answer: ")
-            correct = self.mark_answer(user_answer, q.answer)
-            self.responses.append((q, user_answer, correct))
+            correct = self.mark_answer(user_answer, q.answer)   #calls the marking function
+            self.responses.append((q, user_answer, correct))    #appending/storing the question number, the users answer and whether it was correct or not
             if correct:
                 print(" Correct!")
                 self.score += 1
