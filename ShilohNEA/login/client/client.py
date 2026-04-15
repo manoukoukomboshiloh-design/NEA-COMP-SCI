@@ -47,8 +47,7 @@ def show_dashboard(user_id, username):
 
 def main():
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client.connect(("localhost", 9999))
-	# this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
+	client.connect(("localhost", 9999))  # this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
 
 	message = client.recv(1024).decode()
 	username = input(message)
@@ -62,30 +61,32 @@ def main():
 	#we have the decoding then turning those bytes into a string which is now stored in the variable message, which is then printed to the user as a prompt for their username and password. The client's responses are then sent back to the server for authentication, and the server's response is printed to the user to indicate whether the login was successful or not.
 
 	if "successful" in login_response.lower():
-		# This lower part makes the login check case sensitive.
+		# Checks the users inputted username and passoword against the server side user and password
+		# This lower part turns all letter to lowercase, making it case insensitive
 		user_id = 1
-		show_dashboard(user_id, username)
-		# Topic selection and quiz
+		show_dashboard(user_id, username)         #assign fixed user id and passing it through the displaying dashboard according to id and the username
 		selected_topic = display_menu(question_data)
 		if selected_topic:
-			import threading
-			sys.path.append(QUIZ_DISPLAY_DIR)
-			from auto_timer_with_skip_flag import auto_timer_with_skip_flag
+			import threading #lets part of the program run at the same time
+			sys.path.append(QUIZ_DISPLAY_DIR) ~from the python import paths addind a folder and allowing imports from this directory (gonna be used in other parts of the program)
+			from auto_timer_with_skip_flag import auto_timer_with_skip_flag # timer begins
 			display_notes(selected_topic, question_data)
-			skip_flag = {'skip': False}
+			skip_flag = {'skip': False}         #new dictionary storing a shared variable to be modifed in a threaad. we dont skip the timer until the request is made
 			def ask_skip():
 				answer = input("\nDo you want to skip the timer and go straight to the quiz? Please put 'yes' or 'no': ").strip().lower()
 				if answer == 'yes':
 					skip_flag['skip'] = True
-			t = threading.Thread(target=ask_skip)
+					#skips timer if user requests
+			t = threading.Thread(target=ask_skip)      #new thread created to run ask skip separately
 			t.start()
 			auto_timer_with_skip_flag(skip_flag)
 			user = User(user_id, username)
 			quiz = Quiz(user, question_data)
 			quiz.run(selected_topic)
+			#Running the quiz when the skip is true or when the timer expires
 			return
 	else:
 		print("Login failed. Exiting.")
 
 if __name__ == "__main__":
-	main()
+	main()                   makes sure main program only runs whne the file is executed directly and not whenm imported as a moduyle              
