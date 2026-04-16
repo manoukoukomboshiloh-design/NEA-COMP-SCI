@@ -3,10 +3,11 @@ def get_topic_averages(user_id):
     cur = con.cursor()
 
     cur.execute("""
-        SELECT topic, AVG(score)
+        SELECT topic, AVG(score)   #calculates average score from topics
         FROM progress
-        WHERE user_id = ?
-        GROUP BY topic
+        WHERE user_id = ?          #parameterised query for security
+        GROUP BY topic             
+        #uses 
     """, (user_id,))
 
     results = cur.fetchall()
