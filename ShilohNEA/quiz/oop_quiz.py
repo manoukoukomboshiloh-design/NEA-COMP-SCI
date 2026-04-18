@@ -1,13 +1,22 @@
-import time
-from typing import List
-
+import hashlib
+import os
+import re
 import sqlite3
+import threading
+import time
+from collections import deque
+from typing import Deque, Dict, List, Optional
+
+BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
+DATABASE_PATH = os.path.join(BASE_DIR, 'user_data.db')
+
 
 class Question:
-    def __init__(self, qid: int, text: str, answer: str):
+    def __init__(self, qid: int, text: str, answer: str, notes_context: str = ""):
         self.qid = qid
         self.text = text
         self.answer = answer
+        self.notes_context = notes_context
 
 
 # Linked list node for quiz history
@@ -16,8 +25,9 @@ class QuizHistoryNode:
         self.quiz = quiz
         self.next = next_node
 
+
 class Quiz:
-    def __init__(self, topic: str, questions: List[Question]):
+    def __init__(self, topic: str, questions: List[Question], username: str = "Player"):
         self.topic = topic
         self.questions = questions
         self.score = 0
@@ -30,16 +40,16 @@ class Quiz:
         print(f"{'='*60}\n")
         for i, q in enumerate(self.questions, start=1):
             print(f"Q{i}: {q.text}")
-            user_answer = input("Your answer: ")
+            user_answer = input("You said: ")
             correct = self.mark_answer(user_answer, q.answer)
             self.responses.append((q, user_answer, correct))
             if correct:
-                print("Nice one, correct!")
+                print("YOU GENIUS, COORRREECTT!")
                 self.score += 1
             else:
-                print("Not quite this time.")
+                print("ooo not quite this time.")
 
-            print(f"Correct answer: {q.answer}")
+            print(f"Correct answer was: {q.answer}")
             print("-" * 40)
 
         print(
