@@ -20,7 +20,7 @@ from quiz.display.quizdisplay import display_menu, display_notes
 from quiz.display.question_bank import question_data
 from quiz.getquiz.getquestions import Quiz, User
 
-#Taking the functions and classes from my other folders so I can set up the dashboard, all thats missing is a leaderboard of all my users ordering them on how many questions they ahave answered INSTEAD of how many right as effort shall be rewarded (ts for later)
+#Taking the functions and classes from my other folders so I can set up the dashboard, all thats missing is a leaderboard of all my users ordering them on how many questions they have answered INSTEAD of how many right as effort shall be rewarded (ts for later)
 #OOP 
 #data abstraction 
 #use of modules 

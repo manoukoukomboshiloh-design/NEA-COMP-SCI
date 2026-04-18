@@ -4,7 +4,7 @@ import os        #for file path handling
 import re        #for keyword extraction
 import time
 import sqlite3
-import threading   #runing timer in backgrounmd for the timed quizzes
+import threading   #running timer in background for the timed quizzes
 from collections import deque  #making queues for recommendations
 from typing import Deque, Dict, List, Optional       #multiple imports for type hints
 
@@ -95,7 +95,7 @@ class Quiz:                              #main quiz class
     #it strips out filler words and keeps the physics words that would actually get marks
     @classmethod                           #this is a class method because it doesn't rely on any instance data, just the input text and the predefined stop words and aliases
     def _extract_keywords(cls, text: str) -> set[str]:
-        stop_words = {                                                #filtering out all the waffle/ unecessary words that wont get marks
+        stop_words = {                                                #filtering out all the waffle/ unnecessary words that wont get marks
             "the", "and", "are", "for", "with", "that", "this", "into", "from", "when",
             "what", "your", "have", "has", "had", "been", "their", "them", "then", "than",
             "each", "these", "those", "using", "used", "use", "give", "three", "does", "doesnt",
@@ -172,9 +172,9 @@ class Quiz:                              #main quiz class
                 continue
             if word not in stop_words:
                 keywords.add(word)
-        return keywords                           #giving back the filtered/normslised set of key words from the input text
+        return keywords                           #giving back the filtered/normalised set of key words from the input text
 
-    #now using the filtered key words we can now amrk the answers by comparing them to the keywords available
+    #now using the filtered key words we can now mark the answers by comparing them to the keywords available
     @classmethod
     def mark_answer(cls, user_answer: str, correct_answer: str, notes_context: str = "") -> bool:
         if not user_answer.strip():
@@ -187,7 +187,7 @@ class Quiz:                              #main quiz class
         if not answer_keywords and not notes_keywords:
             return user_answer.strip().lower() == correct_answer.strip().lower()
 
-        physics_terms = {             #DEFENSIVE PRORAMMING, if the extraction fails, its back to basic string comparison, yes its not very accurate but idk man
+        physics_terms = {             #DEFENSIVE PROGRAMMING, if the extraction fails, its back to basic string comparison, yes its not very accurate but idk man
             "precision", "accuracy", "uncertainty", "repeat", "mean", "datalogger", "equipment", #this is basically a guess (can look at this as a limitation of my skills ig)
             "frequency", "wavelength", "phase_difference", "interference", "diffraction",
             "transverse", "longitudinal", "oscillation", "photoelectric_effect", "work_function",
@@ -229,7 +229,7 @@ class TimedQuiz(Quiz):
         print(f"SHILOH'S TIMED QUIZ FOR: {self.topic} (You have: {self.time_limit}s so good luck!)")
         print(f"{'~' * 60}\n")
 
-        #daemon=True means the timer thread wont stop the whole program from closing, its the background thread runing the timer
+        #daemon=True means the timer thread wont stop the whole program from closing, its the background thread running the timer
         timer_thread = threading.Thread(target=self.timer, daemon=True)
         timer_thread.start()
 
