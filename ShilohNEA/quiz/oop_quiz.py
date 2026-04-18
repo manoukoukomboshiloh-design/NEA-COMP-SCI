@@ -1,82 +1,38 @@
-import hashlib
-import math      #calculations of score and mastery
-import os        #for file path handling
-import re        #for keyword extraction
 import time
+from typing import List
+
 import sqlite3
-import threading   #running timer in background for the timed quizzes
-from collections import deque  #making queues for recommendations
-from typing import Deque, Dict, List, Optional       #multiple imports for type hints
 
-from quiz.mark_queries import get_pending_mark_queries, resolve_mark_query, submit_mark_query
-
-#This is database pathing for the user data, ensures database is created in the correct location and can be accessed by all modules without hardcoding paths.
-DATABASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'user_data.db'))
-
-
-#this class is basically just the blueprint for one quiz question
-#it stores the id, the actual question, the answer and any notes context for marking
-class Question:                      #represents a single quiz question topped off with validation
-    #constructor for setting up one question object safely
-    def __init__(self, qid: int, text: str, answer: str, notes_context: str = ""):
-        if not isinstance(qid, int):               #qid should be an integer
-            raise ValueError("Idk man your question id must be an integer!")  
-        if not isinstance(text, str) or not text.strip():               #text should be a non-empty string
-            raise ValueError("Idk man your question text cannot be empty!")
-        if not isinstance(answer, str) or not answer.strip():           #answer should be a non-empty string
-            raise ValueError("Idk man your question answer cannot be empty!")
-        if notes_context is None:
-            notes_context = ""
-        if not isinstance(notes_context, str):
-            raise ValueError("Idk man your notes context must be a string!")
-
-        #Each question object contains the 4 main features of a question  
+class Question:
+    def __init__(self, qid: int, text: str, answer: str):
         self.qid = qid
-        self.text = text.strip()
-        self.answer = answer.strip()
-        self.notes_context = notes_context.strip()
+        self.text = text
+        self.answer = answer
 
 
-#this is one node in the linked list used for quiz history
-#each node stores one quiz result and a pointer to the next one
-class QuizHistoryNode:                #LINKED LIST NODE FOR STORING QUIZ HISTORY IN USER OBJECT
-    #constructor for one linked list node
+# Linked list node for quiz history
+class QuizHistoryNode:
     def __init__(self, quiz, next_node=None):
         self.quiz = quiz
-        self.next = next_node        #the next node depends on the order of quizzes taken, new quizzes are added to the head of the list
+        self.next = next_node
 
-
-#this is the main quiz class and it handles asking questions + keeping score
-class Quiz:                              #main quiz class            
-    #sets up the quiz topic, question list and tracking variables like score
-    def __init__(self, topic: str, questions: List[Question], username: str = "Player"):
-        if not isinstance(topic, str) or not topic.strip():                    #topic should be a non-empty string    
-            raise ValueError("Idk man your quiz topic must be a non-empty string!")
-        if not isinstance(questions, list) or not questions:                   #questions should be a non-empty list of Question objects
-            raise ValueError("Idk man your quiz must contain at least one question!")
-        #attributes of each quiz object
-        self.topic = topic.strip()
+class Quiz:
+    def __init__(self, topic: str, questions: List[Question]):
+        self.topic = topic
         self.questions = questions
         self.score = 0
         self.responses = []
         self.username = username
 
-    def ask_questions(self):              #3 prints statements for nice layout        
-        print(f"\n{'~' * 60}")            
-        print(f"THIS QUIZ IS ON: {self.topic}!!!")
-        print(f"{'~' * 60}\n")
-        #ts function is crash free
-        for i, q in enumerate(self.questions, start=1):      #looping through the questions and asking them one by one, also handling user input (VALIDATION USED) and marking answers
+    def ask_questions(self):
+        print(f"\n{'='*60}")
+        print(f"QUIZ: {self.topic}")
+        print(f"{'='*60}\n")
+        for i, q in enumerate(self.questions, start=1):
             print(f"Q{i}: {q.text}")
-            try:
-                user_answer = input("Your answer: ").strip()
-            except (EOFError, KeyboardInterrupt):
-                print("\nInput interrupted. Blank answer recorded.")            #means the user has entered ctrl+c or ctrl+d, so just record a blank answer and move on to the next question instead of crashing the program
-                user_answer = ""
-
-            correct = self.mark_answer(user_answer, q.answer, getattr(q, "notes_context", ""))       #calls function mark answer to check is answer is correct also passing in the notes context if it exists for better marking accuracy
+            user_answer = input("Your answer: ")
+            correct = self.mark_answer(user_answer, q.answer)
             self.responses.append((q, user_answer, correct))
-
             if correct:
                 print("Nice one, correct!")
                 self.score += 1

@@ -80,16 +80,9 @@ def ensure_server_running():
 	return False
 
 def main():
-    if not ensure_server_running():
-        return
-
-    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    try:
-        client.connect(("localhost", 9999))
-    except OSError as exc:
-        print(f"Could not connect to the login server: {exc}")
-        return
-    # this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
+	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	client.connect(("localhost", 9999))
+	# this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
 
     message = client.recv(1024).decode()
     action = safe_input(message)
@@ -123,26 +116,31 @@ def main():
     #max bytes the client can receive is 1024 
     #we have the decoding then turning those bytes into a string which is now stored in the variable message, which is then printed to the user as a prompt for their username and password. The client's responses are then sent back to the server for authentication, and the server's response is printed to the user to indicate whether the login was successful or not.
 
-    if "successful" in login_response.lower():
-        parts = login_response.split("|")
-        user_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
-        username = parts[2] if len(parts) > 2 else username
-        show_dashboard(user_id, username)
-
-        selected_topic = display_menu(question_data)
-        if selected_topic:
-            from quiz.display.auto_timer_with_skip import auto_timer_with_skip
-            display_notes(selected_topic, question_data)
-            auto_timer_with_skip()
-            user = User(user_id, username)
-            quiz = Quiz(user, question_data)
-            quiz.run(selected_topic)
-            client.close()
-            return
-    else:
-        print(f"This aint {username} lolol. byebye.")
-
-    client.close()
+	if "successful" in login_response.lower():
+		# This lower part makes the login check case sensitive.
+		user_id = 1
+		show_dashboard(user_id, username)
+		# Topic selection and quiz
+		selected_topic = display_menu(question_data)
+		if selected_topic:
+			import threading
+			sys.path.append(QUIZ_DISPLAY_DIR)
+			from auto_timer_with_skip_flag import auto_timer_with_skip_flag
+			display_notes(selected_topic, question_data)
+			skip_flag = {'skip': False}
+			def ask_skip():
+				answer = input("\nDo you want to skip the timer and go straight to the quiz? Please put 'yes' or 'no': ").strip().lower()
+				if answer == 'yes':
+					skip_flag['skip'] = True
+			t = threading.Thread(target=ask_skip)
+			t.start()
+			auto_timer_with_skip_flag(skip_flag)
+			user = User(user_id, username)
+			quiz = Quiz(user, question_data)
+			quiz.run(selected_topic)
+			return
+	else:
+		print("Login failed. Exiting.")
 
 if __name__ == "__main__":
-	main()
+	main()                   makes sure main program only runs whne the file is executed directly and not whenm imported as a moduyle              
