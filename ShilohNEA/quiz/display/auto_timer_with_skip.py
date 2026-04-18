@@ -1,48 +1,25 @@
-import threading
 import time
-import sys
 
-# Non-blocking input for Windows
-try:
-    import msvcrt
-    def getch():
-        return msvcrt.getch().decode('utf-8')
-except ImportError:
-    import sys, tty, termios
-    def getch():
-        fd = sys.stdin.fileno()
-        old_settings = termios.tcgetattr(fd)
-        try:
-            tty.setraw(fd)
-            ch = sys.stdin.read(1)
-        finally:
-            termios.tcsetattr(fd, termios.TCSADRAIN, old_settings)
-        return ch
 
 def auto_timer_with_skip():
-    print("You have 10 minutes to revise... (press 's' then Enter to skip)")
-    start = time.time()
-    skip = False
+    try:
+        answer = input("You have 10 minutes to revise. Type 's' to skip, or press Enter to start: ").strip().lower()
+    except (KeyboardInterrupt, EOFError):
+        print("\nRevision timer skipped.")
+        return True
 
-    def check_skip():
-        nonlocal skip
-        while not skip:
-            ch = sys.stdin.readline().strip().lower()
-            if ch == 's':
-                skip = True
-                break
+    if answer == 's':
+        print("Timer skipped!")
+        return True
 
-    t = threading.Thread(target=check_skip, daemon=True)
-    t.start()
+    print("Revision timer running. Press Ctrl+C at any time to skip.\n")
+    try:
+        for remaining in range(600, 0, -1):
+            print(f"\rTime left: {remaining}s", end="")
+            time.sleep(1)
+    except KeyboardInterrupt:
+        print("\nTimer skipped!")
+        return True
 
-    while True:
-        elapsed = time.time() - start
-        remaining = 600 - elapsed
-        print(f"\rTime left: {int(remaining)}s", end="")
-        if skip:
-            print("\nTimer skipped!")
-            return True
-        if elapsed > 600:
-            print("\nTime's up!")
-            return False
-        time.sleep(1)
+    print("\nTime's up!")
+    return False

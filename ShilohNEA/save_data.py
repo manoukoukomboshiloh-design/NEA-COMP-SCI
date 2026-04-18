@@ -1,7 +1,11 @@
+import os
 import sqlite3
 
+DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), 'user_data.db'))
+
+
 def save_score(user_id, topic, score):
-    con = sqlite3.connect('user_data.db')
+    con = sqlite3.connect(DATABASE_NAME)
     cur = con.cursor()
 
     cur.execute("""
@@ -14,7 +18,7 @@ def save_score(user_id, topic, score):
 
 
 def show_dashboard(user_id):
-    con = sqlite3.connect('user_data.db')
+    con = sqlite3.connect(DATABASE_NAME)
     cur = con.cursor()
 
     print("\n--- DASHBOARD ---")

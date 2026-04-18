@@ -1,7 +1,9 @@
-import sqlite3
 import hashlib
+import os
+import sqlite3
 
-conn = sqlite3.connect("userdata.db")
+DB_PATH = os.path.join(os.path.dirname(__file__), "userdata.db")
+conn = sqlite3.connect(DB_PATH)
 cur = conn.cursor()
 
 cur.execute("""

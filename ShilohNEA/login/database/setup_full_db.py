@@ -1,7 +1,59 @@
+import os
 import sqlite3
 
+DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'user_data.db'))
+
+
+def ensure_progress_table(cur):
+    cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='progress'")
+    if cur.fetchone() is None:
+        cur.execute('''
+        CREATE TABLE progress (
+            id INTEGER PRIMARY KEY,
+            user_id INTEGER NOT NULL,
+            topic VARCHAR(255) NOT NULL,
+            score INTEGER NOT NULL,
+            timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY(user_id) REFERENCES userdata(id)
+        )
+        ''')
+        return
+
+    cur.execute("PRAGMA table_info(progress)")
+    existing_columns = {row[1] for row in cur.fetchall()}
+    required_columns = {'user_id', 'topic', 'score'}
+
+    if required_columns.issubset(existing_columns):
+        return
+
+    cur.execute("ALTER TABLE progress RENAME TO progress_legacy")
+    cur.execute('''
+    CREATE TABLE progress (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER NOT NULL,
+        topic VARCHAR(255) NOT NULL,
+        score INTEGER NOT NULL,
+        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES userdata(id)
+    )
+    ''')
+
+    cur.execute("PRAGMA table_info(progress_legacy)")
+    legacy_columns = {row[1] for row in cur.fetchall()}
+    if {'username', 'score'}.issubset(legacy_columns):
+        cur.execute('''
+        INSERT INTO progress (user_id, topic, score)
+        SELECT COALESCE(u.id, 0), 'General', p.score
+        FROM progress_legacy p
+        LEFT JOIN userdata u ON u.username = p.username
+        WHERE p.score IS NOT NULL
+        ''')
+
+    cur.execute("DROP TABLE progress_legacy")
+
+
 def setup_full_database():
-    con = sqlite3.connect('user_data.db')
+    con = sqlite3.connect(DATABASE_NAME)
     cur = con.cursor()
 
     # Users table
@@ -49,16 +101,7 @@ def setup_full_database():
     ''')
 
     # Progress table (summary)
-    cur.execute('''
-    CREATE TABLE IF NOT EXISTS progress (
-        id INTEGER PRIMARY KEY,
-        user_id INTEGER NOT NULL,
-        topic VARCHAR(255) NOT NULL,
-        score INTEGER NOT NULL,
-        timestamp TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        FOREIGN KEY(user_id) REFERENCES userdata(id)
-    )
-    ''')
+    ensure_progress_table(cur)
 
     con.commit()
     con.close()

@@ -6,7 +6,7 @@ import time
 
 def show_leaderboard():
     try:
-        with sqlite3.connect('user_data.db') as con:
+        with sqlite3.connect(DB_PATH) as con:
             cur = con.cursor()
             cur.execute('''
                 SELECT u.username, COALESCE(SUM(p.score), 0) as total_score, COUNT(p.id) as quizzes_taken
@@ -29,6 +29,7 @@ def show_leaderboard():
 
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
+DB_PATH = os.path.join(PROJECT_ROOT, 'user_data.db')
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
@@ -110,7 +111,8 @@ def run_quiz(selected_topic, data, session):
         print("No questions available for this topic.")
         return 0
 
-    questions = [Question(q['id'], q['question'], q['answer']) for q in questions_data]
+    notes_context = " ".join(data["topics"].get(selected_topic, {}).get("notes", []))
+    questions = [Question(q['id'], q['question'], q['answer'], notes_context=notes_context) for q in questions_data]
     mode = input("Choose quiz mode: 1 for standard, 2 for timed: ").strip()
 
     if mode == "2":
@@ -180,28 +182,33 @@ def login_flow():
         print("Login failed. Please try again.")
 
 
-user = login_flow()
-session = Session(user)
+def main():
+    user = login_flow()
+    session = Session(user)
 
-while True:
-    selected_topic = display_menu(data)
-    if selected_topic is None:
-        print("Program ended")
-        break
-
-    while selected_topic:
-        display_notes(selected_topic, data)
-        try:
-            auto_timer_with_skip()
-        except Exception as e:
-            print(f"Timer error: {e}\nProceeding to quiz...")
-
-        score = run_quiz(selected_topic, data, session)
-        next_topic = recommend_next_topic(score, selected_topic, data, session)
-
-        if next_topic and next_topic != selected_topic:
-            selected_topic = next_topic
-        elif next_topic == selected_topic:
-            continue
-        else:
+    while True:
+        selected_topic = display_menu(data)
+        if selected_topic is None:
+            print("Program ended")
             break
+
+        while selected_topic:
+            display_notes(selected_topic, data)
+            try:
+                auto_timer_with_skip()
+            except Exception as e:
+                print(f"Timer error: {e}\nProceeding to quiz...")
+
+            score = run_quiz(selected_topic, data, session)
+            next_topic = recommend_next_topic(score, selected_topic, data, session)
+
+            if next_topic and next_topic != selected_topic:
+                selected_topic = next_topic
+            elif next_topic == selected_topic:
+                continue
+            else:
+                break
+
+
+if __name__ == "__main__":
+    main()

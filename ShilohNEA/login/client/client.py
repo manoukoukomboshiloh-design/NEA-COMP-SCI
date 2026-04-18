@@ -1,6 +1,8 @@
 
 import socket
+import subprocess
 import sys
+import time
 import os	
 # Need sys for python runtime interaction, these 3 libraries are the basis of networking and file management
 
@@ -9,6 +11,8 @@ BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
 PROGRESS_DIR = os.path.join(BASE_DIR, 'progress')
 QUIZ_DISPLAY_DIR = os.path.join(BASE_DIR, 'quiz', 'display')
 QUIZ_GETQUIZ_DIR = os.path.join(BASE_DIR, 'quiz', 'getquiz')
+SERVER_SCRIPT = os.path.join(BASE_DIR, 'login', 'server', 'server.py')
+SETUP_DB_SCRIPT = os.path.join(BASE_DIR, 'login', 'database', 'setup_db.py')
 
 #Sets up my directory paths for the various modules, and adds them to sys.path if not already present, allowing for imports from those directories.
 #This is absically like the roots of my revision guide tree, and allows me to keep my code organized in different folders without import issues.
@@ -45,47 +49,100 @@ def show_dashboard(user_id, username):
 		#Loops through list of (topic,average) pairs and displays them for the user
 	print("~~~~~~~~~~~~~~~~~~~~~\n")
 
+
+def safe_input(prompt):
+	try:
+		return input(prompt)
+	except (KeyboardInterrupt, EOFError):
+		print("\nRun cancelled.")
+		return None
+
+
+def ensure_server_running():
+	probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+	try:
+		probe.connect(("localhost", 9999))
+		probe.close()
+		return True
+	except OSError:
+		probe.close()
+
+	try:
+		subprocess.run([sys.executable, SETUP_DB_SCRIPT], check=False)
+		subprocess.Popen(
+			[sys.executable, SERVER_SCRIPT],
+			stdout=subprocess.DEVNULL,
+			stderr=subprocess.DEVNULL,
+		)
+		time.sleep(1)
+	except OSError as exc:
+		print(f"Could not start the login server automatically: {exc}")
+		return False
+
+	for _ in range(10):
+		probe = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+		try:
+			probe.connect(("localhost", 9999))
+			probe.close()
+			return True
+		except OSError:
+			probe.close()
+			time.sleep(0.2)
+
+	print("The login server could not be started automatically.")
+	return False
+
 def main():
+	if not ensure_server_running():
+		return
+
 	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	client.connect(("localhost", 9999))
+	try:
+		client.connect(("localhost", 9999))
+	except OSError as exc:
+		print(f"Could not connect to the login server: {exc}")
+		return
 	# this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
 
 	message = client.recv(1024).decode()
-	username = input(message)
+	username = safe_input(message)
+	if username is None:
+		client.close()
+		return
 	client.send(username.encode())
 	message = client.recv(1024).decode()
-	password = input(message)
+	password = safe_input(message)
+	if password is None:
+		client.close()
+		return
 	client.send(password.encode())
 	login_response = client.recv(1024).decode()
-	print(login_response)
+	status_message = login_response.split("|")[0]
+	print(status_message)
 	#max bytes the client can receive is 1024 
 	#we have the decoding then turning those bytes into a string which is now stored in the variable message, which is then printed to the user as a prompt for their username and password. The client's responses are then sent back to the server for authentication, and the server's response is printed to the user to indicate whether the login was successful or not.
 
 	if "successful" in login_response.lower():
 		# This lower part makes the login check case sensitive.
-		user_id = 1
+		parts = login_response.split("|")
+		user_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
+		username = parts[2] if len(parts) > 2 else username
 		show_dashboard(user_id, username)
 		# Topic selection and quiz
 		selected_topic = display_menu(question_data)
 		if selected_topic:
-			import threading
 			sys.path.append(QUIZ_DISPLAY_DIR)
-			from auto_timer_with_skip_flag import auto_timer_with_skip_flag
+			from auto_timer_with_skip import auto_timer_with_skip
 			display_notes(selected_topic, question_data)
-			skip_flag = {'skip': False}
-			def ask_skip():
-				answer = input("\nDo you want to skip the timer and go straight to the quiz? Please put 'yes' or 'no': ").strip().lower()
-				if answer == 'yes':
-					skip_flag['skip'] = True
-			t = threading.Thread(target=ask_skip)
-			t.start()
-			auto_timer_with_skip_flag(skip_flag)
+			auto_timer_with_skip()
 			user = User(user_id, username)
 			quiz = Quiz(user, question_data)
 			quiz.run(selected_topic)
 			return
 	else:
 		print("Login failed. Exiting.")
+
+	client.close()
 
 if __name__ == "__main__":
 	main()
