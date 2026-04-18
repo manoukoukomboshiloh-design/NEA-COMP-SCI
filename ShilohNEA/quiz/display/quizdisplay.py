@@ -33,24 +33,53 @@ DB_PATH = os.path.join(PROJECT_ROOT, 'user_data.db')
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from quiz.display.question_bank import question_data as data
+from quiz.display.question_bank import question_data as data, save_user_question
 from quiz.topic_graph import graph
 from quiz.oop_quiz import Question, Quiz, RevisionPlanner, Session, TimedQuiz, User
 
 
-def display_menu(data):
-    all_topics = list(data["topics"].keys())
+def prompt_add_question(data):
+    print("\nAdd your own question to the shared JSON file")
+    topic = input("Topic: ").strip()
+    question = input("Question: ").strip()
+    answer = input("Mark scheme answer: ").strip()
 
+    try:
+        new_entry = save_user_question(topic, question, answer)
+    except ValueError as exc:
+        print(exc)
+        return
+
+    if topic not in data["topics"]:
+        data["topics"][topic] = {"notes": [], "questions": []}
+
+    existing_pairs = {
+        (item.get("question", ""), item.get("answer", ""))
+        for item in data["topics"][topic].get("questions", [])
+    }
+    if (question, answer) not in existing_pairs:
+        data["topics"][topic].setdefault("questions", []).append(new_entry)
+
+    print("Your question has been saved. Cheers for contributing.")
+
+
+def display_menu(data):
     while True:
+        all_topics = list(data["topics"].keys())
+
         print("Welcome, please select a topic number")
         for i, topic in enumerate(all_topics, start=1):
             print(f"{i}. {topic}")
+        print("A. Add a question")
         print("L. Leaderboard")
         print("0. Exit")
 
-        choice = input("Enter a topic number or 'L' for leaderboard: ").strip()
+        choice = input("Enter a topic number, 'A' to add a question or 'L' for leaderboard: ").strip()
         if choice.lower() == 'l':
             show_leaderboard()
+            continue
+        if choice.lower() == 'a':
+            prompt_add_question(data)
             continue
 
         try:
@@ -62,7 +91,7 @@ def display_menu(data):
                 return all_topics[choice_num - 1]
             print(f"Gotta be a number between 1 and {len(all_topics)}")
         except ValueError:
-            print("Enter a valid whole number or 'L'")
+            print("Enter a valid whole number, 'A' or 'L'")
 
 
 def display_notes(selected_topic, data):

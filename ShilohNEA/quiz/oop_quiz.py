@@ -8,6 +8,8 @@ import threading   #runing timer in backgrounmd for the timed quizzes
 from collections import deque  #making queues for recommendations
 from typing import Deque, Dict, List, Optional       #multiple imports for type hints
 
+from quiz.mark_queries import get_pending_mark_queries, resolve_mark_query, submit_mark_query
+
 #This is database pathing for the user data, ensures database is created in the correct location and can be accessed by all modules without hardcoding paths.
 DATABASE_PATH = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'user_data.db'))
 
@@ -22,7 +24,12 @@ class Question:                      #represents a single quiz question topped o
         if not isinstance(text, str) or not text.strip():               #text should be a non-empty string
             raise ValueError("Idk man your question text cannot be empty!")
         if not isinstance(answer, str) or not answer.strip():           #answer should be a non-empty string
-            raise ValueError("Idk man your question answer cannot be empty!")        #if wrong value error is raised
+            raise ValueError("Idk man your question answer cannot be empty!")
+        if notes_context is None:
+            notes_context = ""
+        if not isinstance(notes_context, str):
+            raise ValueError("Idk man your notes context must be a string!")
+
         #Each question object contains the 4 main features of a question  
         self.qid = qid
         self.text = text.strip()
@@ -47,7 +54,7 @@ class Quiz:                              #main quiz class
             raise ValueError("Idk man your quiz topic must be a non-empty string!")
         if not isinstance(questions, list) or not questions:                   #questions should be a non-empty list of Question objects
             raise ValueError("Idk man your quiz must contain at least one question!")
-        #attributes of da quiz class
+        #attributes of each quiz object
         self.topic = topic.strip()
         self.questions = questions
         self.score = 0
@@ -86,9 +93,9 @@ class Quiz:                              #main quiz class
 
     #this helper is for the marking system
     #it strips out filler words and keeps the physics words that would actually get marks
-    @classmethod
+    @classmethod                           #this is a class method because it doesn't rely on any instance data, just the input text and the predefined stop words and aliases
     def _extract_keywords(cls, text: str) -> set[str]:
-        stop_words = {
+        stop_words = {                                                #filtering out all the waffle/ unecessary words that wont get marks
             "the", "and", "are", "for", "with", "that", "this", "into", "from", "when",
             "what", "your", "have", "has", "had", "been", "their", "them", "then", "than",
             "each", "these", "those", "using", "used", "use", "give", "three", "does", "doesnt",
@@ -102,7 +109,7 @@ class Quiz:                              #main quiz class
             "above", "below", "across", "while", "where", "there", "here", "theyre", "youre"
         }
 
-        phrase_aliases = {
+        phrase_aliases = {                                 #normalisation used, converting different ways of saying the same thing into a single standard form so they can be matched more easily
             "phase relationship": "phase_difference",
             "constant phase difference": "phase_difference",
             "constant phase relationship": "phase_difference",
@@ -116,7 +123,7 @@ class Quiz:                              #main quiz class
             "weak nuclear": "weak_nuclear",
         }
 
-        word_aliases = {
+        word_aliases = {                              #again more normalisation used but for single words this time
             "wavelengths": "wavelength",
             "frequencies": "frequency",
             "oscillations": "oscillation",
@@ -143,64 +150,63 @@ class Quiz:                              #main quiz class
             "times": "multiply",
             "velocity": "speed",
             "relationship": "difference",
+            "estimate": "estimation",
+            "estimating": "estimation",
+            "estimated": "estimation",
         }
 
-        #first we normalise the text so different ways of saying the same thing are treated the same
+        #convert text to lowercase THEN normalise the text so different ways of saying the same thing are treated the same
         cleaned = text.lower().replace("λ", " wavelength ").replace("μ", " micro ").replace("e.m.", " electromagnetic ")
         for phrase, replacement in phrase_aliases.items():
-            cleaned = cleaned.replace(phrase, replacement)
+            cleaned = cleaned.replace(phrase, replacement)  #replacing the phrases in clean text with their normalised versions
 
         keywords = set()
-        for raw_word in re.findall(r"[A-Za-z0-9_+-]+", cleaned):
+        for raw_word in re.findall(r"[A-Za-z0-9_+-]+", cleaned):         #use of regex, which will split my text into words and keep only the valid word characters
             word = word_aliases.get(raw_word, raw_word)
-            if word.endswith("ies") and len(word) > 4:
+            if word.endswith("ies") and len(word) > 4:              #if a word ends with ies, its probably a plural of a word ending in y, so we convert it back to the singular form for better matching (eg: frequencies -> frequency)
                 word = word[:-3] + "y"
-            elif word.endswith("s") and len(word) > 4 and not word.endswith("ss"):
+            elif word.endswith("s") and len(word) > 4 and not word.endswith("ss"): #same thing here but for s, assuming its plural
                 word = word[:-1]
 
-            if len(word) <= 2 and not any(ch.isdigit() for ch in word):
+            if len(word) <= 2 and not any(ch.isdigit() for ch in word): #now removing any short words that probably wont be a physics term, but keep ones with numbers as they could be for example, units
                 continue
             if word not in stop_words:
                 keywords.add(word)
-        return keywords
+        return keywords                           #giving back the filtered/normslised set of key words from the input text
 
-    #this is the actual marking method
-    #idea is simple: if the student's answer contains most of the important physics words, give the mark
+    #now using the filtered key words we can now amrk the answers by comparing them to the keywords available
     @classmethod
     def mark_answer(cls, user_answer: str, correct_answer: str, notes_context: str = "") -> bool:
         if not user_answer.strip():
             return False
 
-        user_keywords = cls._extract_keywords(user_answer)
-        answer_keywords = cls._extract_keywords(correct_answer)
-        notes_keywords = cls._extract_keywords(notes_context)
+        user_keywords = cls._extract_keywords(user_answer) #running the user answer through the same key word extraction process to get the important bits of their answer that we want to mark on
+        answer_keywords = cls._extract_keywords(correct_answer)   #same for correct answer
+        notes_keywords = cls._extract_keywords(notes_context)     #and also using the notes, maybe a user put something that wasnt in the correct answer but appears on the notes
 
         if not answer_keywords and not notes_keywords:
             return user_answer.strip().lower() == correct_answer.strip().lower()
 
-        physics_terms = {
-            "precision", "accuracy", "uncertainty", "repeat", "mean", "datalogger", "equipment",
+        physics_terms = {             #DEFENSIVE PRORAMMING, if the extraction fails, its back to basic string comparison, yes its not very accurate but idk man
+            "precision", "accuracy", "uncertainty", "repeat", "mean", "datalogger", "equipment", #this is basically a guess (can look at this as a limitation of my skills ig)
             "frequency", "wavelength", "phase_difference", "interference", "diffraction",
             "transverse", "longitudinal", "oscillation", "photoelectric_effect", "work_function",
             "threshold_frequency", "electron", "photon", "gamma", "energy", "radiation",
             "momentum", "mass", "speed", "acceleration", "force", "resultant_force",
-            "line_spectrum", "proton", "neutron", "antineutrino", "excitation"
+            "line_spectrum", "proton", "neutron", "antineutrino", "excitation", "estimation"
         }
 
-        #this picks out the best marking words:
-        #1) words that appear in both the official answer and the notes are probs important
-        #2) then we also force in common physics terms we defo care about
-        key_mark_words = answer_keywords & notes_keywords
-        key_mark_words.update(word for word in (answer_keywords | notes_keywords) if word in physics_terms)
+        key_mark_words = answer_keywords & notes_keywords   # best keywords are ones that show up in both the answer and the revision notes
+        key_mark_words.update(word for word in answer_keywords if word in physics_terms)
+        key_mark_words.update(word for word in notes_keywords if word in physics_terms)
 
         if not key_mark_words:
-            key_mark_words = answer_keywords | notes_keywords
+            key_mark_words = set(answer_keywords) if answer_keywords else set(notes_keywords)
 
-        #majority rule happens here
-        #if they got more than half of the key words, the answer counts as correct
+        #majority rule, if the answer has more than half the key mark words its correct
         match_count = len(user_keywords & key_mark_words)
-        required_matches = max(1, (len(key_mark_words) // 2) + 1)
-        return match_count >= required_matches
+        keyword_ratio = match_count / len(key_mark_words)
+        return keyword_ratio > 0.5
 
 
 #this class inherits from Quiz but adds a timer on top
@@ -214,31 +220,31 @@ class TimedQuiz(Quiz):
     #this runs in the background while the quiz is happening
     def timer(self):
         time.sleep(self.time_limit)
-        self.time_up = True
+        self.time_up = True                   #when true the quiz stops
         print("\nTime's up!\n")
 
     #this version of ask_questions stops early if the timer finishes
     def ask_questions(self):
-        print(f"\n{'=' * 60}")
-        print(f"TIMED QUIZ: {self.topic} (Time limit: {self.time_limit}s)")
-        print(f"{'=' * 60}\n")
+        print(f"\n{'~' * 60}")
+        print(f"SHILOH'S TIMED QUIZ FOR: {self.topic} (You have: {self.time_limit}s so good luck!)")
+        print(f"{'~' * 60}\n")
 
-        #daemon=True means the timer thread wont stop the whole program from closing
+        #daemon=True means the timer thread wont stop the whole program from closing, its the background thread runing the timer
         timer_thread = threading.Thread(target=self.timer, daemon=True)
         timer_thread.start()
 
-        for i, q in enumerate(self.questions, start=1):
+        for i, q in enumerate(self.questions, start=1):   #communication between the 2 threads, end quiz when time is up
             if self.time_up:
                 break
 
-            print(f"Q{i}: {q.text}")
+            print(f"Q{i}: {q.text}")      #asking the question and getting user input, same as before but with the timer running in the background
             try:
                 user_answer = input("Your answer: ").strip()
             except (EOFError, KeyboardInterrupt):
                 print("\nInput interrupted. Blank answer recorded.")
                 user_answer = ""
 
-            correct = self.mark_answer(user_answer, q.answer, getattr(q, "notes_context", ""))
+            correct = self.mark_answer(user_answer, q.answer, getattr(q, "notes_context", ""))  # defensive program while calling marking function
             self.responses.append((q, user_answer, correct))
 
             if correct:
@@ -248,7 +254,7 @@ class TimedQuiz(Quiz):
                 print("Not quite this time.")
 
             print(f"Correct answer: {q.answer}")
-            print("-" * 40)
+            print("=" * 40)
 
         print(
             f"Ayy good job on finishing the quiz, {self.username}! "
@@ -360,7 +366,6 @@ class User:
             node = node.next
             i += 1
 
-
 #this is just a recursive graph traversal to print linked topics nicely
 #depth controls the indentation so you can see the branches more clearly
 def recursive_topic_recommend(graph, current_topic, visited=None, depth=0):
@@ -440,7 +445,7 @@ class Session:
     def push_completed_quiz(self, quiz: Quiz):
         self.completed_quiz_stack.append((quiz.topic, quiz.score, time.time()))
 
-    #classic stack behaviour - remove the last completed quiz if needed
+    #WE GOT A STACK!!! - remove the last completed quiz if needed
     def undo_last_quiz(self) -> Optional[tuple[str, int, float]]:
         if not self.completed_quiz_stack:
             return None
@@ -469,7 +474,9 @@ class Session:
     #gets the next topic from the front of the queue
     def get_next_recommendation(self) -> Optional[str]:
         if self.recommendation_queue:
-            return self.recommendation_queue.popleft()gt
+            return self.recommendation_queue.popleft()
+        return None
+
     def start_quiz(self, quiz: Quiz):
         import datetime
 
@@ -490,7 +497,7 @@ class Session:
                 quiz_id = cur.lastrowid
                 con.commit()
 
-            #this line actually runs the whole quiz interaction with the user
+            #runs the whole quiz interaction with the user
             quiz.ask_questions()
 
             #after the quiz finishes, each response gets saved to the results table

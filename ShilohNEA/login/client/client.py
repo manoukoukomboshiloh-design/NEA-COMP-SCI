@@ -3,35 +3,22 @@ import socket
 import subprocess
 import sys
 import time
-import os	
+import os
 # Need sys for python runtime interaction, these 3 libraries are the basis of networking and file management
 
 
 BASE_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), '../..'))
-PROGRESS_DIR = os.path.join(BASE_DIR, 'progress')
-QUIZ_DISPLAY_DIR = os.path.join(BASE_DIR, 'quiz', 'display')
-QUIZ_GETQUIZ_DIR = os.path.join(BASE_DIR, 'quiz', 'getquiz')
 SERVER_SCRIPT = os.path.join(BASE_DIR, 'login', 'server', 'server.py')
 SETUP_DB_SCRIPT = os.path.join(BASE_DIR, 'login', 'database', 'setup_db.py')
 
-#Sets up my directory paths for the various modules, and adds them to sys.path if not already present, allowing for imports from those directories.
-#This is absically like the roots of my revision guide tree, and allows me to keep my code organized in different folders without import issues.
+# putting the project root on sys.path lets python find the other folders cleanly
+if BASE_DIR not in sys.path:
+    sys.path.insert(0, BASE_DIR)
 
-
-if PROGRESS_DIR not in sys.path:
-	sys.path.insert(0, PROGRESS_DIR)
-if QUIZ_DISPLAY_DIR not in sys.path:
-	sys.path.insert(0, QUIZ_DISPLAY_DIR)
-if QUIZ_GETQUIZ_DIR not in sys.path:
-	sys.path.insert(0, QUIZ_GETQUIZ_DIR)
-
-#Ts makes the whole program look nice ye with custom folders that python can import from
-
-
-from dashboard import get_topic_averages, get_total_quizzes, get_best_score
-from quizdisplay import display_menu, display_notes
-from question_bank import question_data
-from getquestions import Quiz, User
+from progress.dashboard import get_topic_averages, get_total_quizzes, get_best_score
+from quiz.display.quizdisplay import display_menu, display_notes
+from quiz.display.question_bank import question_data
+from quiz.getquiz.getquestions import Quiz, User
 
 #Taking the functions and classes from my other folders so I can set up the dashboard, all thats missing is a leaderboard of all my users ordering them on how many questions they ahave answered INSTEAD of how many right as effort shall be rewarded (ts for later)
 #OOP 
@@ -93,56 +80,69 @@ def ensure_server_running():
 	return False
 
 def main():
-	if not ensure_server_running():
-		return
+    if not ensure_server_running():
+        return
 
-	client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-	try:
-		client.connect(("localhost", 9999))
-	except OSError as exc:
-		print(f"Could not connect to the login server: {exc}")
-		return
-	# this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
+    client = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    try:
+        client.connect(("localhost", 9999))
+    except OSError as exc:
+        print(f"Could not connect to the login server: {exc}")
+        return
+    # this is connecting the client to da server, which is running on the same machine (localhost) and listening on port 9999. This sets up the communication channel for sending and receiving data between the client and server.
 
-	message = client.recv(1024).decode()
-	username = safe_input(message)
-	if username is None:
-		client.close()
-		return
-	client.send(username.encode())
-	message = client.recv(1024).decode()
-	password = safe_input(message)
-	if password is None:
-		client.close()
-		return
-	client.send(password.encode())
-	login_response = client.recv(1024).decode()
-	status_message = login_response.split("|")[0]
-	print(status_message)
-	#max bytes the client can receive is 1024 
-	#we have the decoding then turning those bytes into a string which is now stored in the variable message, which is then printed to the user as a prompt for their username and password. The client's responses are then sent back to the server for authentication, and the server's response is printed to the user to indicate whether the login was successful or not.
+    message = client.recv(1024).decode()
+    action = safe_input(message)
+    if action is None:
+        client.close()
+        return
+    client.send(action.strip().encode())
 
-	if "successful" in login_response.lower():
-		# This lower part makes the login check case sensitive.
-		parts = login_response.split("|")
-		user_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
-		username = parts[2] if len(parts) > 2 else username
-		show_dashboard(user_id, username)
-		# Topic selection and quiz
-		selected_topic = display_menu(question_data)
-		if selected_topic:
-			sys.path.append(QUIZ_DISPLAY_DIR)
-			from auto_timer_with_skip import auto_timer_with_skip
-			display_notes(selected_topic, question_data)
-			auto_timer_with_skip()
-			user = User(user_id, username)
-			quiz = Quiz(user, question_data)
-			quiz.run(selected_topic)
-			return
-	else:
-		print("Login failed. Exiting.")
+    if action.strip().lower() in {"3", "exit", "quit"}:
+        print(client.recv(1024).decode())
+        client.close()
+        return
 
-	client.close()
+    message = client.recv(1024).decode()
+    username = safe_input(message)
+    if username is None:
+        client.close()
+        return
+    client.send(username.encode())
+
+    message = client.recv(1024).decode()
+    password = safe_input(message)
+    if password is None:
+        client.close()
+        return
+    client.send(password.encode())
+
+    login_response = client.recv(1024).decode()
+    status_message = login_response.split("|")[0]
+    print(status_message)
+    #max bytes the client can receive is 1024 
+    #we have the decoding then turning those bytes into a string which is now stored in the variable message, which is then printed to the user as a prompt for their username and password. The client's responses are then sent back to the server for authentication, and the server's response is printed to the user to indicate whether the login was successful or not.
+
+    if "successful" in login_response.lower():
+        parts = login_response.split("|")
+        user_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
+        username = parts[2] if len(parts) > 2 else username
+        show_dashboard(user_id, username)
+
+        selected_topic = display_menu(question_data)
+        if selected_topic:
+            from quiz.display.auto_timer_with_skip import auto_timer_with_skip
+            display_notes(selected_topic, question_data)
+            auto_timer_with_skip()
+            user = User(user_id, username)
+            quiz = Quiz(user, question_data)
+            quiz.run(selected_topic)
+            client.close()
+            return
+    else:
+        print(f"This aint {username} lolol. byebye.")
+
+    client.close()
 
 if __name__ == "__main__":
 	main()

@@ -45,6 +45,13 @@ class QuizMarkingTests(unittest.TestCase):
 
         self.assertTrue(Quiz.mark_answer(user_answer, correct_answer, notes_context))
 
+    def test_accepts_single_keyword_answer_when_that_is_the_full_mark_point(self):
+        correct_answer = "Estimation."
+        notes_context = "Physicists must be able to estimate orders of magnitude and approximate values of physical quantities."
+        user_answer = "Estimation"
+
+        self.assertTrue(Quiz.mark_answer(user_answer, correct_answer, notes_context))
+
     def test_rejects_answer_missing_most_key_terms(self):
         correct_answer = "Waves that maintain a constant phase relationship with each other over time."
         notes_context = "Coherent sources produce waves with a constant phase difference and the same frequency."

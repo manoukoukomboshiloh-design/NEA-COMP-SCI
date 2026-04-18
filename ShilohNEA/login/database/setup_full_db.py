@@ -103,6 +103,25 @@ def setup_full_database():
     # Progress table (summary)
     ensure_progress_table(cur)
 
+    # Mark review requests table
+    cur.execute('''
+    CREATE TABLE IF NOT EXISTS mark_queries (
+        id INTEGER PRIMARY KEY,
+        user_id INTEGER,
+        username TEXT NOT NULL,
+        topic TEXT NOT NULL,
+        question_text TEXT NOT NULL,
+        expected_answer TEXT NOT NULL,
+        user_answer TEXT NOT NULL,
+        reason TEXT,
+        status TEXT NOT NULL DEFAULT 'pending',
+        admin_notes TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        reviewed_at TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES userdata(id)
+    )
+    ''')
+
     con.commit()
     con.close()
 

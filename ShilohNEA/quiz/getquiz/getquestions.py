@@ -9,6 +9,8 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from save_data import save_score, show_dashboard
+from quiz.mark_queries import submit_mark_query
+from quiz.oop_quiz import Quiz as MarkingQuiz
 
 
 class Node:
@@ -122,23 +124,7 @@ class Quiz:
         return keywords
 
     def _is_correct(self, user_answer, expected_answer, notes_text):
-        if not user_answer.strip():
-            return False
-
-        user_keywords = self._extract_keywords(user_answer)
-        answer_keywords = self._extract_keywords(expected_answer)
-        notes_keywords = self._extract_keywords(notes_text)
-
-        key_mark_words = answer_keywords & notes_keywords
-        if not key_mark_words:
-            key_mark_words = answer_keywords
-
-        if not key_mark_words:
-            return user_answer.strip().lower() == expected_answer.strip().lower()
-
-        match_count = len(user_keywords & key_mark_words)
-        required = max(1, min(3, math.ceil(len(key_mark_words) * 0.5)))
-        return match_count >= required
+        return MarkingQuiz.mark_answer(user_answer, expected_answer, notes_text)
 
     def run(self, selected_topic):
         topic_info = self.data["topics"][selected_topic]
@@ -152,7 +138,23 @@ class Quiz:
 
         for q in quiz_questions:
             print(q["question"])
-            user_answer = input("Your answer: ")
+            user_answer = input("Your answer (type ? to request a review): ").strip()
+
+            if user_answer == "?":
+                proposed_answer = input("What answer do you want reviewed?: ").strip()
+                reason = input("Why do you think it should get the mark?: ").strip()
+                query_id = submit_mark_query(
+                    user_id=self.user.user_id,
+                    username=self.user.username,
+                    topic=selected_topic,
+                    question_text=q["question"],
+                    expected_answer=q["answer"],
+                    user_answer=proposed_answer or "[No answer provided]",
+                    reason=reason,
+                )
+                print(f"Your mark review request has been saved for admin review. Query id: {query_id}\n")
+                wrong_questions.add(q)
+                continue
 
             if self._is_correct(user_answer, q["answer"], notes_text):
                 print("heck yeah keep it up!\n")
@@ -160,6 +162,19 @@ class Quiz:
             else:
                 print(f"Chin up nephew, this was the right answer: {q['answer']}\n")
                 wrong_questions.add(q)
+                follow_up = input("Press Enter to continue or type ? to request a mark review: ").strip()
+                if follow_up == "?":
+                    reason = input("Why do you think your answer should count?: ").strip()
+                    query_id = submit_mark_query(
+                        user_id=self.user.user_id,
+                        username=self.user.username,
+                        topic=selected_topic,
+                        question_text=q["question"],
+                        expected_answer=q["answer"],
+                        user_answer=user_answer,
+                        reason=reason,
+                    )
+                    print(f"Review request saved for admin review. Query id: {query_id}\n")
 
         print(f"You scored {self.score} out of 5")
 

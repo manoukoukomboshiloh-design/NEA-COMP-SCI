@@ -1,4 +1,7 @@
 import json
+import os
+
+USER_QUESTIONS_FILE = os.path.join(os.path.dirname(__file__), "user_questions.json")
 
 question_data = {
     "topics": {
@@ -397,3 +400,92 @@ question_data = {
         }
     }
 }
+
+
+def _next_question_id(data):
+    max_id = 0
+    for topic_info in data.get("topics", {}).values():
+        for question in topic_info.get("questions", []):
+            max_id = max(max_id, int(question.get("id", 0)))
+    return max_id + 1
+
+
+def load_user_questions(data=None, json_path=USER_QUESTIONS_FILE):
+    if data is None:
+        data = question_data
+
+    if not os.path.exists(json_path):
+        return data
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as handle:
+            stored_data = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return data
+
+    next_id = _next_question_id(data)
+    for topic, questions in stored_data.get("topics", {}).items():
+        if topic not in data["topics"]:
+            data["topics"][topic] = {"notes": [], "questions": []}
+
+        existing_pairs = {
+            (item.get("question", ""), item.get("answer", ""))
+            for item in data["topics"][topic].get("questions", [])
+        }
+
+        for question in questions:
+            pair = (question.get("question", "").strip(), question.get("answer", "").strip())
+            if not pair[0] or not pair[1] or pair in existing_pairs:
+                continue
+
+            entry = {
+                "id": int(question.get("id", next_id)),
+                "question": pair[0],
+                "answer": pair[1],
+            }
+            data["topics"][topic].setdefault("questions", []).append(entry)
+            existing_pairs.add(pair)
+            next_id = max(next_id, entry["id"] + 1)
+
+    return data
+
+
+def save_user_question(topic, question, answer, json_path=USER_QUESTIONS_FILE):
+    topic = topic.strip()
+    question = question.strip()
+    answer = answer.strip()
+
+    if not topic or not question or not answer:
+        raise ValueError("Topic, question and answer cannot be blank.")
+
+    stored_data = {"topics": {}}
+    if os.path.exists(json_path):
+        try:
+            with open(json_path, "r", encoding="utf-8") as handle:
+                stored_data = json.load(handle)
+        except (json.JSONDecodeError, OSError):
+            stored_data = {"topics": {}}
+
+    stored_data.setdefault("topics", {}).setdefault(topic, [])
+    next_id = max(
+        _next_question_id(question_data),
+        1 + max(
+            (int(item.get("id", 0)) for items in stored_data["topics"].values() for item in items),
+            default=0,
+        ),
+    )
+
+    new_entry = {
+        "id": next_id,
+        "question": question,
+        "answer": answer,
+    }
+    stored_data["topics"][topic].append(new_entry)
+
+    with open(json_path, "w", encoding="utf-8") as handle:
+        json.dump(stored_data, handle, indent=4)
+
+    return new_entry
+
+
+load_user_questions(question_data)
