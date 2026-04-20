@@ -25,6 +25,4 @@ This is a simple client-server login system using Python sockets and SQLite data
    python login/client/client.py
    ```
 
-## Usage
-
 The client will ask for a username and password. Use the information in the database e.g  username is mike123, the password is mikepassword. ez ez ez ez ez ez ez ez ez
