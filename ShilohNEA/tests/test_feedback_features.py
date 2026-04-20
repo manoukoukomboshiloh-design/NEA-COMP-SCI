@@ -1,16 +1,21 @@
+import io
 import json
 import os
+import random
 import sqlite3
 import sys
 import tempfile
 import unittest
+from contextlib import redirect_stdout
+from unittest.mock import patch
 
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from quiz.mark_queries import get_pending_mark_queries, submit_mark_query
-from quiz.display.question_bank import save_user_question
+from quiz.display.question_bank import question_data, save_user_question
+from quiz.getquiz.getquestions import Quiz, User
 
 
 class FeedbackFeatureTests(unittest.TestCase):
@@ -68,6 +73,46 @@ class FeedbackFeatureTests(unittest.TestCase):
 
         self.assertIn('Mechanics', data['topics'])
         self.assertEqual(data['topics']['Mechanics'][0]['question'], 'What is impulse?')
+
+    def test_quiz_allows_exit_back_to_menu(self):
+        random.seed(1)
+        user = User(1, 'alice')
+        quiz = Quiz(user, question_data)
+        inputs = iter(['q'])
+
+        output = io.StringIO()
+        with patch('builtins.input', side_effect=lambda prompt='': next(inputs)):
+            with redirect_stdout(output):
+                score, wrong_questions = quiz.run('Waves')
+
+        self.assertEqual(score, 0)
+        self.assertIn('main menu', output.getvalue().lower())
+        self.assertEqual(wrong_questions.to_list(), [])
+
+    def test_quiz_accepts_multiple_choice_answer(self):
+        user = User(1, 'alice')
+        data = {
+            'topics': {
+                'Mini Topic': {
+                    'notes': ['Force equals mass multiplied by acceleration.'],
+                    'questions': [
+                        {
+                            'id': 1,
+                            'question': 'What is Newton\'s second law?',
+                            'answer': 'F = ma',
+                            'options': ['A. F = ma', 'B. E = mc^2', 'C. V = IR', 'D. p = mv'],
+                        }
+                    ],
+                }
+            }
+        }
+        quiz = Quiz(user, data)
+        inputs = iter(['A'])
+
+        with patch('builtins.input', side_effect=lambda prompt='': next(inputs)):
+            score, _ = quiz.run('Mini Topic')
+
+        self.assertEqual(score, 1)
 
 
 if __name__ == '__main__':

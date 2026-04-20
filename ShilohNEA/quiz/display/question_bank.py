@@ -450,13 +450,27 @@ def load_user_questions(data=None, json_path=USER_QUESTIONS_FILE):
     return data
 
 
+def get_user_questions(json_path=USER_QUESTIONS_FILE):
+    if not os.path.exists(json_path):
+        return {"topics": {}}
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as handle:
+            stored_data = json.load(handle)
+    except (json.JSONDecodeError, OSError):
+        return {"topics": {}}
+
+    stored_data.setdefault("topics", {})
+    return stored_data
+
+
 def save_user_question(topic, question, answer, json_path=USER_QUESTIONS_FILE):
     topic = topic.strip()
     question = question.strip()
     answer = answer.strip()
 
     if not topic or not question or not answer:
-        raise ValueError("Topic, question and answer cannot be blank.")
+        raise ValueError("Well we just cant have it all blank can we?")
 
     stored_data = {"topics": {}}
     if os.path.exists(json_path):
@@ -486,6 +500,26 @@ def save_user_question(topic, question, answer, json_path=USER_QUESTIONS_FILE):
         json.dump(stored_data, handle, indent=4)
 
     return new_entry
+
+
+def delete_user_question(topic, question_id, json_path=USER_QUESTIONS_FILE):
+    stored_data = get_user_questions(json_path=json_path)
+    questions = stored_data.get("topics", {}).get(topic, [])
+
+    for index, entry in enumerate(questions):
+        if int(entry.get("id", 0)) != int(question_id):
+            continue
+
+        deleted_entry = questions.pop(index)
+        if not questions:
+            stored_data["topics"].pop(topic, None)
+
+        with open(json_path, "w", encoding="utf-8") as handle:
+            json.dump(stored_data, handle, indent=4)
+
+        return deleted_entry
+
+    raise ValueError("Question could not be found.")
 
 
 load_user_questions(question_data)

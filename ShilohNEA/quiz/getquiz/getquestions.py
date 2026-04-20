@@ -98,6 +98,7 @@ class Quiz:
         self.user = user
         self.data = data
         self.score = 0
+        self.exited_early = False
 
     @staticmethod
     def _extract_keywords(text):
@@ -135,10 +136,35 @@ class Quiz:
 
         wrong_questions = LinkedList()
         self.score = 0
+        self.exited_early = False
+
+        print("\n" * 25, end="")
+        print(f"\n{'~' * 60}")
+        print(f"SHILOH'S QUIZ FOR: {selected_topic}")
+        print(f"{'~' * 60}\n")
 
         for q in quiz_questions:
             print(q["question"])
-            user_answer = input("Your answer (type ? to request a review): ").strip()
+
+            options = q.get("options", [])
+            for option in options:
+                print(option)
+
+            user_answer = input("Your answer (type ? to request a review or q to quit): ").strip()
+
+            if user_answer.lower() in {"q", "quit", "exit"}:
+                self.exited_early = True
+                print("Leaving the quiz and returning to the main menu...\n")
+                return self.score, wrong_questions
+
+            if options and len(user_answer) == 1 and user_answer.upper() in "ABCD":
+                option_index = ord(user_answer.upper()) - ord("A")
+                if 0 <= option_index < len(options):
+                    selected_option = options[option_index]
+                    if ". " in selected_option:
+                        user_answer = selected_option.split(". ", 1)[1]
+                    elif ") " in selected_option:
+                        user_answer = selected_option.split(") ", 1)[1]
 
             if user_answer == "?":
                 proposed_answer = input("What answer do you want reviewed?: ").strip()
@@ -162,7 +188,11 @@ class Quiz:
             else:
                 print(f"Chin up nephew, this was the right answer: {q['answer']}\n")
                 wrong_questions.add(q)
-                follow_up = input("Press Enter to continue or type ? to request a mark review: ").strip()
+                follow_up = input("Press Enter to continue, type ? for a review, or q to quit: ").strip()
+                if follow_up.lower() in {"q", "quit", "exit"}:
+                    self.exited_early = True
+                    print("Leaving the quiz and returning to the main menu...\n")
+                    return self.score, wrong_questions
                 if follow_up == "?":
                     reason = input("Why do you think your answer should count?: ").strip()
                     query_id = submit_mark_query(
@@ -176,9 +206,11 @@ class Quiz:
                     )
                     print(f"Review request saved for admin review. Query id: {query_id}\n")
 
-        print(f"You scored {self.score} out of 5")
+        total_questions = len(quiz_questions)
+        pass_mark = max(1, math.ceil(total_questions * 0.8))
+        print(f"You scored {self.score} out of {total_questions}")
 
-        if self.score >= 4:
+        if self.score >= pass_mark:
             print("Ayyy Congrats, you passed the quiz!")
         else:
             print("Better luck next time g")

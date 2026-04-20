@@ -63,7 +63,7 @@ def handle_connection(client_socket):
         if user_row:
             client_socket.send(f"Login successful!|{user_row[0]}|{user_row[1]}".encode())
         else:
-            client_socket.send("Login failed!".encode())
+            client_socket.send("Login failed! WHO IS THIS GUY??".encode())
     finally:
         client_socket.close()
 

@@ -13,19 +13,45 @@ if BASE_DIR not in sys.path:
 
 from progress.dashboard import get_best_score, get_total_quizzes, get_topic_averages
 from quiz.display.question_bank import question_data
-from quiz.display.quizdisplay import display_menu, display_notes
+from quiz.display.quizdisplay import BACK_TO_DASHBOARD, auto_timer_with_skip, display_menu, display_notes, show_leaderboard
 from quiz.getquiz.getquestions import Quiz, User
 
 
 def show_dashboard(user_id, username):
-    print("\n~~~~ DASHBOARD ~~~~")
+    separator = "~~~~~~~~~~~~~~~~~~~~~"
+    print(f"\n{separator}")
+    print("~~~~ DASHBOARD ~~~~")
+    print(separator)
     print(f"User: {username} (ID: {user_id})")
     print(f"Total quizzes taken: {get_total_quizzes(user_id)}")
     print(f"Best score: {get_best_score(user_id)}")
-    print("\nAverage scores by topic:")
+    print(separator)
+    print("Average scores by topic:")
     for topic, avg in get_topic_averages(user_id):
         print(f"- {topic}: {avg:.2f}")
-    print("~~~~~~~~~~~~~~~~~~~~~\n")
+    print(separator)
+    print()
+    print()
+
+
+def dashboard_menu():
+    while True:
+        print("1. Questions")
+        print("2. Leaderboard")
+        print("0. Exit")
+        choice = safe_input("Enter 1 for questions, 2 for leaderboard or 0 to exit: ")
+        if choice is None:
+            return 'exit'
+
+        choice = choice.strip().lower()
+        if choice == '1':
+            return 'questions'
+        if choice == '2':
+            return 'leaderboard'
+        if choice in {'0', 'exit', 'quit'}:
+            return 'exit'
+
+        print("Enter 1, 2 or 0.")
 
 
 def safe_input(prompt):
@@ -112,16 +138,32 @@ def main():
 
         user_id = int(parts[1]) if len(parts) > 1 and parts[1].isdigit() else 1
         username = parts[2] if len(parts) > 2 else username.strip()
-        show_dashboard(user_id, username)
-
         user = User(user_id, username)
+
         while True:
-            selected_topic = display_menu(question_data)
+            show_dashboard(user_id, username)
+            next_step = dashboard_menu()
+
+            if next_step == 'exit':
+                print("Okie dokie see you soon..")
+                break
+
+            if next_step == 'leaderboard':
+                leaderboard_action = show_leaderboard()
+                if leaderboard_action == 'exit':
+                    print("Okie dokie see you soon..")
+                    break
+                continue
+
+            selected_topic = display_menu(question_data, allow_back=True)
+            if selected_topic == BACK_TO_DASHBOARD:
+                continue
             if not selected_topic:
-                print("See you next time.")
+                print("Okie dokie see you soon..")
                 break
 
             display_notes(selected_topic, question_data)
+            auto_timer_with_skip()
             quiz = Quiz(user, question_data)
             quiz.run(selected_topic)
 

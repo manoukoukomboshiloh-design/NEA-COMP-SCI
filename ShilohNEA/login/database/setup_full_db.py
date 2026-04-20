@@ -3,7 +3,6 @@ import sqlite3
 
 DATABASE_NAME = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..', 'user_data.db'))
 
-
 def ensure_progress_table(cur):
     cur.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='progress'")
     if cur.fetchone() is None:
@@ -51,11 +50,9 @@ def ensure_progress_table(cur):
 
     cur.execute("DROP TABLE progress_legacy")
 
-
 def setup_full_database():
     con = sqlite3.connect(DATABASE_NAME)
     cur = con.cursor()
-
     # Users table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS userdata (
@@ -64,7 +61,6 @@ def setup_full_database():
         password VARCHAR(255) NOT NULL
     )
     ''')
-
     # Questions table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS questions (
@@ -74,7 +70,6 @@ def setup_full_database():
         answer TEXT NOT NULL
     )
     ''')
-
     # Quizzes table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS quizzes (
@@ -86,7 +81,6 @@ def setup_full_database():
         FOREIGN KEY(user_id) REFERENCES userdata(id)
     )
     ''')
-
     # Results table (quiz results per question)
     cur.execute('''
     CREATE TABLE IF NOT EXISTS results (
@@ -99,10 +93,8 @@ def setup_full_database():
         FOREIGN KEY(question_id) REFERENCES questions(id)
     )
     ''')
-
     # Progress table (summary)
     ensure_progress_table(cur)
-
     # Mark review requests table
     cur.execute('''
     CREATE TABLE IF NOT EXISTS mark_queries (

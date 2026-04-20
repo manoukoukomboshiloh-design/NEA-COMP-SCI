@@ -58,3 +58,5 @@ def show_dashboard(user_id):
     print(f"Total Quizzes: {total}")
 
     con.close() 
+    print()
+    print()

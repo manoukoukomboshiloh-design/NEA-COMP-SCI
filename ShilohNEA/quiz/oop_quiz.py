@@ -35,9 +35,10 @@ class Quiz:
         self.username = username
 
     def ask_questions(self):
-        print(f"\n{'='*60}")
+        print("\n" * 25, end="")
+        print(f"\n{'~'*60}")
         print(f"QUIZ: {self.topic}")
-        print(f"{'='*60}\n")
+        print(f"{'~'*60}\n")
         for i, q in enumerate(self.questions, start=1):
             print(f"Q{i}: {q.text}")
             user_answer = input("You said: ")
@@ -146,6 +147,11 @@ class Quiz:
         if not user_answer.strip():
             return False
 
+        simplified_user = re.sub(r"[^a-z0-9]+", "", user_answer.lower())
+        simplified_correct = re.sub(r"[^a-z0-9]+", "", correct_answer.lower())
+        if simplified_user and simplified_user == simplified_correct:
+            return True
+
         user_keywords = cls._extract_keywords(user_answer) #running the user answer through the same key word extraction process to get the important bits of their answer that we want to mark on
         answer_keywords = cls._extract_keywords(correct_answer)   #same for correct answer
         notes_keywords = cls._extract_keywords(notes_context)     #and also using the notes, maybe a user put something that wasnt in the correct answer but appears on the notes
@@ -169,10 +175,14 @@ class Quiz:
         if not key_mark_words:
             key_mark_words = set(answer_keywords) if answer_keywords else set(notes_keywords)
 
-        #majority rule, if the answer has more than half the key mark words its correct
+        if user_keywords and user_keywords.issubset(key_mark_words | answer_keywords | notes_keywords):
+            if len(user_keywords) >= max(1, min(2, len(key_mark_words))):
+                return True
+
+        #majority rule, but made a bit more forgiving for natural phrasing
         match_count = len(user_keywords & key_mark_words)
-        keyword_ratio = match_count / len(key_mark_words)
-        return keyword_ratio > 0.5
+        required_matches = max(1, (len(key_mark_words) + 1) // 2)
+        return match_count >= required_matches
 
 
 #this class inherits from Quiz but adds a timer on top
@@ -220,7 +230,7 @@ class TimedQuiz(Quiz):
                 print("Not quite this time.")
 
             print(f"Correct answer: {q.answer}")
-            print("=" * 40)
+            print("~" * 40)
 
         print(
             f"Ayy good job on finishing the quiz, {self.username}! "
