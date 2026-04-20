@@ -16,13 +16,13 @@ This is a simple client-server login system using Python sockets and SQLite data
    ```
 
 2. Start the server:
-   ```
+   
    python login/server/server.py
-   ```
+   
 
 3. In another terminal, run the client:
-   ```
+   
    python login/client/client.py
-   ```
+   
 
 The client will ask for a username and password. Use the information in the database e.g  username is mike123, the password is mikepassword. ez ez ez ez ez ez ez ez ez
